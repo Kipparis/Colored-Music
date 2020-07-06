@@ -1,0 +1,6 @@
+> compile d for distib, m for model ino list-models
+ino build -d /usr/share/arduino10 -m leonardo
+
+> upload
+ino upload -d /usr/share/arduino10 -m leonardo -p <port>
+
