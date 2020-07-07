@@ -7,10 +7,17 @@ enum LedState {
     IDLE
 };
 
+enum BlinkState {
+    BLINK_INTERPOLATING,
+    BLINK_IDLE
+};
+
 class Led {
 public:
     Led(const int RED_PIN, const int GREEN_PIN, const int BLUE_PIN):
-        r_pin(RED_PIN), g_pin(GREEN_PIN), b_pin(BLUE_PIN), state(IDLE) {
+        r_pin(RED_PIN), g_pin(GREEN_PIN), b_pin(BLUE_PIN),
+        state(IDLE), blink_state(BLINK_IDLE), blink_duration(250),
+        blink_multyplier(0.5) {
         // when led turns on, it's initially all lithen up
         // so we turn off each one of the lights
         set_red(0);     // turn off red color
@@ -20,7 +27,8 @@ public:
         r_start = g_start = b_start = 0;
     }
 
-    void start_interpolate(String end_point);
+    // do something with the input
+    void handle(String inp);
     void interpolate();
 private:
     const int r_pin, g_pin, b_pin;
@@ -36,21 +44,56 @@ private:
     unsigned long start_time;
     // led state (exclude spamming "analogWrite" when there're no command)
     LedState state;
+    //======== blink variables ========
+    // so we know what happens rn
+    BlinkState blink_state;
+    // increase + fade blink duration (ms)
+    const int blink_duration;
+    // how strong does blink feals
+    double blink_multyplier;
+    unsigned long blink_start_time;
     //======== Functions manipulating led color ========
-    void set_red(int val) { /* analogWrite(r_pin, val); */ }
-    void set_green(int val) { /* analogWrite(g_pin, val); */ }
-    void set_blue(int val) { /* analogWrite(b_pin, val); */ }
+    void set_red(int val) {
+        /* analogWrite(r_pin, val); */
+        Serial.print("r: ");
+        Serial.println(val);
+    }
+    void set_green(int val) {
+        /* analogWrite(r_pin, val); */
+        Serial.print("g: ");
+        Serial.println(val);
+    }
+    void set_blue(int val) {
+        /* analogWrite(r_pin, val); */
+        Serial.print("b: ");
+        Serial.println(val);
+    }
     void set_rgb(int r_val, int g_val, int b_val) {
         set_red(r_val); set_green(g_val); set_blue(b_val);
+        Serial.println("---------------------------------");
     }
     //======== Interpolate asistance =========
+    void start_interpolate(String end_point);
     int interpolate_value(int start, int end, double delta) {
         return _lerp(start, end, delta);
     }
     int _lerp(int start, int end, double delta) {
         return int(start + delta * (end - start));
     }
+    int interpolate_value_blink(int start, double delta);
 };
+
+
+void Led::handle(String incoming_message) {
+    if (incoming_message.length() == 2) {
+        // this means beat occure
+        blink_multyplier = double(incoming_message.toInt() + 1) / 10.0;
+        blink_state = BLINK_INTERPOLATING;
+        blink_start_time = millis();
+    } else {
+        start_interpolate(incoming_message);
+    }
+}
 
 // set variables so let may correctly interpolate
 void Led::start_interpolate(String end_point) {
@@ -89,33 +132,42 @@ void Led::start_interpolate(String end_point) {
 void Led::interpolate() {
     if (state == INTERPOLATING) {
         unsigned long current_time = millis();
-        double delta = double(current_time - start_time)/double(duration);
         // if we're done with interpolating
         if (current_time >= start_time + duration) {
             set_rgb(r_end, g_end, b_end);   // set end values
-            r_start = r_end;
-            g_start = g_end;
-            b_start = b_end;
+            r_curr = r_start = r_end;
+            g_curr = g_start = g_end;
+            b_curr = b_start = b_end;
             state = IDLE;               // don't run this function any more
-            Serial.print("Interpolated to: ");
-            Serial.print(r_end);
-            Serial.print(" ");
-            Serial.print(g_end);
-            Serial.print(" ");
-            Serial.println(b_end);
         } else {
+            double delta = double(current_time - start_time)/double(duration);
             r_curr = interpolate_value(r_start, r_end, delta);
             g_curr = interpolate_value(g_start, g_end, delta);
             b_curr = interpolate_value(b_start, b_end, delta);
-            set_rgb(r_curr, g_curr, b_curr);
-            Serial.print("Interpolated to: ");
-            Serial.print(r_curr);
-            Serial.print(" ");
-            Serial.print(g_curr);
-            Serial.print(" ");
-            Serial.println(b_curr);
+            if (blink_state == BLINK_IDLE)
+                set_rgb(r_curr, g_curr, b_curr);
         }
     }
+
+    if (blink_state == BLINK_INTERPOLATING) {
+        unsigned long current_time = millis();
+        if (current_time >= blink_start_time + blink_duration) {
+            blink_state = BLINK_IDLE;
+        }
+        else {
+            double delta = double(current_time - blink_start_time)
+                / double(blink_duration);
+            set_rgb(interpolate_value_blink(r_curr, delta),
+                interpolate_value_blink(g_curr, delta),
+                interpolate_value_blink(b_curr, delta));
+        }
+    }
+}
+
+int Led::interpolate_value_blink(int color_curr, double delta) {
+    return delta < 0.5
+        ? min(int(color_curr + blink_multyplier * delta * color_curr), 255)
+        : min(int(color_curr + color_curr * blink_multyplier - color_curr * delta * blink_multyplier), 255);
 }
 
 const int RED_PIN   = 18;   // red pin on led band
@@ -148,7 +200,7 @@ void loop() {
     // check if there are complete message
     if (stringComplete) {
         // tell led to set interpolation point
-        led.start_interpolate(inputString);
+        led.handle(inputString);
         stringComplete = false;
         inputString = "";
     } else {
