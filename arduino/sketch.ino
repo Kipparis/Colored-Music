@@ -1,10 +1,26 @@
 #include <Thread.h> // library for threads
 
-const int LED_PIN = 13; // led pin index
+class Led {
+public:
+    Led(const int RED_PIN, const int GREEN_PIN, const int BLUE_PIN):
+        r_pin(RED_PIN), g_pin(GREEN_PIN), b_pin(BLUE_PIN) {}
+    void start_interpolate(String end_point);
+    void interpolate();
+private:
+    const int r_pin, g_pin, b_pin;
+};
 
-Thread ledThread = Thread();    // thread for led
+// set variables so let may correctly interpolate
+void Led::start_interpolate(String end_point) {
 
-void ledBlink();    // toggle led
+}
+
+const int RED_PIN   = 18;   // red pin on led band
+const int GREEN_PIN = 19;   // green pin on led band
+const int BLUE_PIN  = 20;   // blue pin on led band
+
+led = Led(RED_PIN, GREEN_PIN, BLUE_PIN);
+
 void serialEvent(); // read char every time serial is available
 
 String inputString = "";    // string to hold incoming data
@@ -15,23 +31,21 @@ void setup() {
 
     Serial.begin(9600);
 
-    ledThread.onRun(ledBlink);      // set task for thread
-    ledThread.setInterval(1000);    // set working interval (ms)
-
     inputString.reserve(200);   // reserve 200 bytes for the inputString
 }
 
 void loop() {
-    // is it time to run ledThread()?
-    if (ledThread.shouldRun())
-        ledThread.run();    // run thread
+    // if there are something to read?
     if(Serial.available() > 0)
         serialEvent();
+    // check if there are complete message
     if (stringComplete) {
-        Serial.println("STRING IS COMPLETE");
-        Serial.println(inputString);
+        // tell led to set interpolation point
+        led.start_interpolate(stringComplete);
         stringComplete = false;
         inputString = "";
+    } else {
+        led.interpolate()
     }
 }
 
