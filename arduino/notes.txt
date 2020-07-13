@@ -1,6 +1,15 @@
+> open bluetoothctl, pair and trust to HC-6
+> bind bluetooth port to serial port
+sudo rfcomm bind rfcomm0 <mac_adress>
+> if you need to unbind
+sudo rfcomm unbind rfcomm0
+
 > compile d for distib, m for model ino list-models
 ino build -d /usr/share/arduino10 -m leonardo
 
 > upload
 ino upload -d /usr/share/arduino10 -m leonardo -p <port>
 
+> serial port
+picocom -b 9600 /dev/ttyACM0 # <C-a>, q to exit
+ screen /dev/rfcomm0 9600,cs8,-parenb,-cstopb,-hupcl  #  use ^a, k to exit.

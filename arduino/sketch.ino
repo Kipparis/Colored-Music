@@ -1,4 +1,4 @@
-/* #include <Thread.h> // library for threads */
+#include <Arduino.h>
 
 typedef unsigned int uint;
 
@@ -54,23 +54,23 @@ private:
     unsigned long blink_start_time;
     //======== Functions manipulating led color ========
     void set_red(int val) {
-        /* analogWrite(r_pin, val); */
-        Serial.print("r: ");
-        Serial.println(val);
+        analogWrite(r_pin, 255 - val);
+        /* Serial.print("r: "); */
+        /* Serial.println(val); */
     }
     void set_green(int val) {
-        /* analogWrite(r_pin, val); */
-        Serial.print("g: ");
-        Serial.println(val);
+        analogWrite(g_pin, 255 - val);
+        /* Serial.print("g: "); */
+        /* Serial.println(val); */
     }
     void set_blue(int val) {
-        /* analogWrite(r_pin, val); */
-        Serial.print("b: ");
-        Serial.println(val);
+        analogWrite(b_pin, 255 - val);
+        /* Serial.print("b: "); */
+        /* Serial.println(val); */
     }
     void set_rgb(int r_val, int g_val, int b_val) {
         set_red(r_val); set_green(g_val); set_blue(b_val);
-        Serial.println("---------------------------------");
+        /* Serial.println("---------------------------------"); */
     }
     //======== Interpolate asistance =========
     void start_interpolate(String end_point);
@@ -120,11 +120,11 @@ void Led::start_interpolate(String end_point) {
 
     duration   = end_point.substring(stop_idx + 1, next_idx).toInt();
     start_time = millis();
-    Serial.print("Interpolating to\n\r");
-    Serial.println(r_end);
-    Serial.println(g_end);
-    Serial.println(b_end);
-    Serial.println(duration);
+    /* Serial.print("Interpolating to\n\r"); */
+    /* Serial.println(r_end); */
+    /* Serial.println(g_end); */
+    /* Serial.println(b_end); */
+    /* Serial.println(duration); */
 
     state = INTERPOLATING;
 }
@@ -170,33 +170,44 @@ int Led::interpolate_value_blink(int color_curr, double delta) {
         : min(int(color_curr + color_curr * blink_multyplier - color_curr * delta * blink_multyplier), 255);
 }
 
-const int RED_PIN   = 18;   // red pin on led band
-const int GREEN_PIN = 19;   // green pin on led band
-const int BLUE_PIN  = 20;   // blue pin on led band
-
-Led led(RED_PIN, GREEN_PIN, BLUE_PIN);
-
-void serialEvent(); // read char every time serial is available
+const int RED_PIN   = 9;    // red pin on led band
+const int GREEN_PIN = 10;   // green pin on led band
+const int BLUE_PIN  = 11;   // blue pin on led band
 
 String inputString = "";    // string to hold incoming data
 bool stringComplete = false;    // whether the string is complete
 
+// those while(!Serial) is the key for bluetooth to work
 void setup() {
-    // set led pins to output
-    /* pinMode(RED_PIN, OUTPUT); */
-    /* pinMode(GREEN_PIN, OUTPUT); */
-    /* pinMode(BLUE_PIN, OUTPUT); */
-
+    /* Serial.begin(9600);     // serial */
+    /* while (!Serial)         // wait until serial is ready */
+    /* Serial.println("Serial is ready"); */
     // start serial messaging
-    Serial.begin(9600);
+    Serial1.begin(9600);    // bluetooth
+    while (!Serial1)        // wait until serial1 is ready
+    /* Serial.println("Bluetooth is ready"); */
+    /* Serial1.println("serial established"); */
+
+    // set led pins to output
+    pinMode(RED_PIN, OUTPUT);
+    pinMode(GREEN_PIN, OUTPUT);
+    pinMode(BLUE_PIN, OUTPUT);
 
     inputString.reserve(200);   // reserve 200 bytes for the inputString
 }
 
+// abstraction for led band
+Led led(RED_PIN, GREEN_PIN, BLUE_PIN);
+
+// read char every time serial is available
+void bluetoothEvent();
+
+bool newline_printed = false;
+
 void loop() {
     // if there are something to read?
-    if(Serial.available() > 0)
-        serialEvent();
+    if (Serial1.available())
+        bluetoothEvent();
     // check if there are complete message
     if (stringComplete) {
         // tell led to set interpolation point
@@ -221,10 +232,12 @@ SerialEvent occurs whenever a new data comes in the hardware serial RX. This
 routine is run between each time loop() runs, so using delay inside loop can
 delay response. Multiple bytes of data may be available.
 */
-void serialEvent() {
-    while (Serial.available()) {
+void bluetoothEvent() {
+    /* Serial.println("Bluetooth available"); */
+    while (Serial1.available()) {
+        /* Serial.println("Reading char from bluetoothEvent()"); */
         // get the new byte:
-        char inChar = (char)Serial.read();
+        char inChar = (char)Serial1.read();
         // add it to the inputString:
         inputString += inChar;
         // if the incoming character is a newline, set a flag so the main loop can
