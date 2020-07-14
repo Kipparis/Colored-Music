@@ -42,7 +42,7 @@ parser.add_argument(
     '-q', '--buffersize', type=int, default=20,
     help='number of blocks used for buffering (default: %(default)s)')
 parser.add_argument(
-    '-u', '--loudness', type=float, default=1,
+    '-u', '--loudness', type=float, default=0.5,
     help='how loud music is')
 args = parser.parse_args(remaining)
 if args.blocksize == 0:
@@ -143,9 +143,12 @@ if __name__ == "__main__":
             for c, song in enumerate(pleer.songs, start=1):
                 print(f"{c}. {song.split('/')[-1]}")
             # -1 becouse counting is from 1
-            song_ind = int(input("choose song to play: ")) - 1
-            # play specific song
-            pleer.set_ind(song_ind)
+            try:
+                song_ind = int(input("choose song to play: ")) - 1
+                # play specific song
+                pleer.set_ind(song_ind)
+            except KeyboardInterrupt:
+                pass
         elif key_code == 104:   # 'h' key
             print("previous song...")
             pleer.previous_song()

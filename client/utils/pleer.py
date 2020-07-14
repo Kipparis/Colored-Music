@@ -68,8 +68,11 @@ class Pleer(Process):
         self.connection_opened = True
         try:
             self.color_controller = serial.Serial(color_ctl)    # serial port to arduino
-        except PermissionError:
+            self.color_controller.write(b"0 0 0 100\0")
+            print("Connection is opened")
+        except (PermissionError, serial.serialutil.SerialException, FileNotFoundError):
             self.connection_opened = False
+            print("Connection is closed")
         pass
 
     def __del__(self):
@@ -163,8 +166,9 @@ class Pleer(Process):
             raise sd.CallbackStop
         else:
             beat = self.beat_detect()
-            output_beat(beat, self.color_controller)
-            outdata[:] = data
+            if self.connection_opened:
+                output_beat(beat, self.color_controller)
+            outdata[:] = data * self.loudness
 
     # call this when music finishes (music queue is empty)
     def finished(self):
@@ -215,18 +219,23 @@ class Pleer(Process):
         """
         # calculate np array no play
         fl = self.song_name_full
+        print("\rPlaying: {}".format(fl))
 
         # x, sr = librosa.load(fl)
         # float32 - so librosa can understand
         # always_2d - so sounddevice can play it
-        x, sr = sf.read(fl, dtype="float32", always_2d=True)
+        x, self.sr = sf.read(fl, dtype="float32", always_2d=True)
         music_arr = x
-        print("\r(_set_song_impl) music_arr shape: {}".format(music_arr.shape))
+        # print("\r(_set_song_impl) music_arr shape: {}".format(music_arr.shape))
 
         # bpm = get_file_bpm(fl)
         # if self.connection_opened:
         #     send_on_device(device_file_name, bpm, self.color_controller)
         # print("\rbpm is {}".format(bpm))
+        colors = get_color(x, self.sr)
+        print("\rcolors is: {}".format(colors))
+        if self.connection_opened:
+            send_on_device(self.color_controller, colors)
 
         start = 0;
         end = start + self.block_size;
@@ -240,24 +249,24 @@ class Pleer(Process):
             if (start > len(music_arr)): break
 
         # self.beat_detect = BeatDetection(3, self.q, self.block_size, inf[0])
-        self.beat_detect = BeatDetection(3, music_arr, self.block_size, sr)
+        self.beat_detect = BeatDetection(3, music_arr, self.block_size, self.sr, fl)
 
         # if not hasattr(self, "stream"):
-        self.play(music_arr, sr)
+        self.play()
         # add songs id so you can return to previously played
         self.song_ind_stack.append(self.current_song_ind)
 
 
     # play song
-    def play(self, music_arr, sr):
+    def play(self):
         self.stream = sd.OutputStream(
-            samplerate=sr,
+            samplerate=self.sr,
             blocksize=self.block_size,
             device=self.device,
             channels=1,
             callback=self,
             finished_callback=self.finished,
-            dtype='{}'.format(music_arr.dtype))    # replace with "{}".format(music_arr.dtype)
+            dtype='float32')
         self.state = PleerState.PLAYING
         self.stream.__enter__()
         pass
@@ -280,7 +289,7 @@ class Pleer(Process):
     def make_louder(self):
         # you have to round because you're working with floating points
         # when it's small, it never will be 0, but really close to it (12e-12)
-        if round(self.loudness,1) != 2.0:
+        if round(self.loudness,1) != 1.0:
             self.loudness += self.volume_part_size
         print("\rloudness: {}".format(self.loudness))
 
@@ -309,7 +318,8 @@ class Pleer(Process):
             self.event_occure.wait()    # blocking until event
 
             if self.action == PleerAction.SET_SONG:
-                if self.state == PleerState.PLAYING:
+                if self.state == PleerState.PLAYING or\
+                        self.state == PleerState.PAUSED:
                     self.stop()
                 self._set_song_impl()
             elif self.action == PleerAction.SONG_FINISHED:

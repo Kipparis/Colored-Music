@@ -9,31 +9,40 @@ import librosa.display
 
 class BeatDetection():
 
-    def __init__(self, multiplier, arr, block_size, samplerate):
+    def __init__(self, multiplier, arr, block_size, samplerate, song_name):
         self.multiplier = multiplier
         self.block_size = block_size
         sr = samplerate
 
         self.peaks = []
-        print("\rArr shape: {}".format(arr.shape))
+        # print("\rArr shape: {}".format(arr.shape))
         x = arr
-        print("\rself.arr shape:\t{}".format(x.shape))
-        print("\rx[,0] shape:\t{}".format(x[:,0].shape))
-        print("\rsr:\t{}".format(sr))
-        print("\rframes len:\t{}".format(len(x)/sr))
+        # print("\rself.arr shape:\t{}".format(x.shape))
+        # print("\rx[,0] shape:\t{}".format(x[:,0].shape))
+        # print("\rsr:\t{}".format(sr))
+        # print("\rframes len:\t{}".format(len(x)/sr))
+
 
         # interval for stft
         hop_length = 512
+        self.fib = int(block_size / (hop_length * 2))
+        # print("\rframes_in_block: {}".format(self.fib))
         # frequency edges to detect
-        bot_edge = 6
+        bot_edge = 8
         top_edge = 16
         # edges for peak picking
-        max_edge  = 40
+        # max_edge  = 40
+        # avg_edge  = 100
+        # avg_delta = 100
+        # tested: fallen + one touch + nfdreams + movements_ + 24 на 7
+        max_edge  = 10
         avg_edge  = 100
-        avg_delta = 100
+        avg_delta = 63
 
+        x, sr = librosa.load(song_name)
         # maybe pass hop_length, frame_length
-        S = librosa.stft(x[:,0], hop_length=hop_length)
+        # S = librosa.stft(x[:,0], hop_length=hop_length)
+        S = librosa.stft(x, hop_length=hop_length)
         # human senses are logariphmic
         # leave window for n_fft to default (2048)
         logS = librosa.amplitude_to_db(abs(S))
@@ -46,6 +55,7 @@ class BeatDetection():
         low_freq_novelty = np.max([np.zeros_like(low_freq_diff), low_freq_diff], axis=0)
         # find peaks
         peak_frames = librosa.util.peak_pick(low_freq_novelty, max_edge, max_edge, avg_edge, avg_edge, avg_delta, 1)
+        # print("\rlen(peak_frames) is: {}".format(len(peak_frames)))
 
         # # plot result
         # frames = np.arange(len(low_freq_novelty))
@@ -57,7 +67,7 @@ class BeatDetection():
 
         # copy
         self.onset_frames = peak_frames[:]
-        print("\rself.onset_frames is: {}".format(self.onset_frames))
+        # print("\rself.onset_frames is: {}".format(self.onset_frames))
 
 
         self.idx       = 0  # index in queue of music pieces
@@ -65,7 +75,8 @@ class BeatDetection():
 
     def __call__(self):
         beat = 0
-        if self.onset_frames[self.last_beat] in range(self.idx * 4, 4 * (self.idx + 1)):
+        if self.last_beat < len(self.onset_frames) and\
+                self.onset_frames[self.last_beat] in range(self.idx * self.fib, self.fib * (self.idx + 1)):
             print("\rb\t{}:{}".format(self.idx,self.onset_frames[self.last_beat]))
             self.last_beat += 1
             beat = 1
@@ -79,10 +90,6 @@ def time_to_idx(sec, sr):
 
 def idx_to_time(idx, sr):
     return int(idx / sr)
-
-def get_file_bpm(path):
-    # TODO: implement this
-    return 220
 
 
 def bpm_get_color(bpm):
@@ -130,18 +137,51 @@ def output_beat(beat, fl):
     threading.Thread(target=output_to_device, args=(string,fl)).start()
     pass
 
-def send_on_device(device_file_name, bpm, fl):
-    r, g, b = bpm_get_color(bpm)
-    string = "{} {} {} 0 4 0\n".format(r, g, b)
+def send_on_device(fl, colors):
+    r, g, b = colors
+    string = "{} {} {} 800\0".format(r, g, b).encode()
     threading.Thread(target=output_to_device,args=(string,fl)).start()
 
-    print("\rcalculated: r - {}\tg - {}\tb - {}".format(r,g,b))
+    # print("\rcalculated: r - {}\tg - {}\tb - {}".format(r,g,b))
 
-# def beat_occure(device_file_name):
-#     # TODO: send type of message as 1 --
-#     # X X X <len beat increase> <len beat fade> 1
-#     try:
-#         with open(device_file_name, "w") as f:
-#             f.write("0 0 0 2 4 1")
-#     pass
+def get_coefficient(x, sr):
+    S = librosa.stft(x[:,0])
+    # human senses are logariphmic
+    # leave window for n_fft to default (2048)
+    logS = librosa.amplitude_to_db(abs(S))
+    # get maximum index from summed frequences
+    max_index = np.argmax(logS.sum(axis=1).flatten())   # gives as value between 0 and 1025
+    # print("\rmax_index is: {}".format(max_index))
+    normilized_max_index = (max_index * 300) / logS.shape[1]
+    return normilized_max_index
+
+def get_color(x, sr):
+    """
+    colors are generated in range [0;120] and fulfill those requirements:
+
+    1. colors sum is greater than 50
+        if not: multiply all the values
+    """
+
+    colors = np.zeros(3)
+
+    coef = get_coefficient(x, sr)
+    # print("\rcoef is: {}".format(coef))
+
+    # better to change values by 10, if value change was smaller you won't notice it
+    # maybe pass hop_length, frame_length
+    # multiply maximum number in 12 calculate system by normalized_max_index
+    # convert to 3 numbers in 12 calculate system
+
+    colors_num = 12
+    number = int(coef * colors_num**3)
+    # print("\rnumber is: {}".format(number))
+
+    for i in range(len(colors)):
+        colors[i] = int(number % colors_num) * 10
+        number = int(number / colors_num)
+
+    colors[1], colors[2] = colors[2], colors[1]
+    # print("\rcolors is: {}".format(colors))
+    return colors
 
