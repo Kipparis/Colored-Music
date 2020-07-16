@@ -225,14 +225,18 @@ class Pleer(Process):
         # float32 - so librosa can understand
         # always_2d - so sounddevice can play it
         x, self.sr = sf.read(fl, dtype="float32", always_2d=True)
-        music_arr = x
-        # print("\r(_set_song_impl) music_arr shape: {}".format(music_arr.shape))
+        if x.shape[1] == 2:  # if not mono
+            music_arr = np.sum(x, axis=1).reshape((len(x),1))/2
+        else:
+            music_arr = x
+        print("\r(_set_song_impl) music_arr shape: {}".format(music_arr.shape))
+        print(music_arr)
 
         # bpm = get_file_bpm(fl)
         # if self.connection_opened:
         #     send_on_device(device_file_name, bpm, self.color_controller)
         # print("\rbpm is {}".format(bpm))
-        colors = get_color(x, self.sr)
+        colors = get_color(music_arr, self.sr)
         print("\rcolors is: {}".format(colors))
         if self.connection_opened:
             send_on_device(self.color_controller, colors)
