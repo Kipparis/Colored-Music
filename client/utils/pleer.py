@@ -100,8 +100,7 @@ class Pleer(Process):
         return(self.song_list)
 
     def set_mode(self, mode):
-        assert(isinstance(mode, PleerMode)), \
-                "pass PleerMode enum inst"
+        assert(isinstance(mode, PleerMode)), "pass PleerMode enum inst"
         self.playing_mode = mode
 
 
@@ -131,8 +130,7 @@ class Pleer(Process):
             elif self.playing_mode == PleerMode.CIRCLE:
                 song_ind = 0
             elif self.playing_mode == PleerMode.RANDOM:
-                song_ind =\
-                random.randrange(0,len(self.song_list),1)
+                song_ind = random.randrange(0,len(self.song_list),1)
         else:
             # pick next according to mode
             if self.playing_mode == PleerMode.SERIAL:
@@ -140,8 +138,7 @@ class Pleer(Process):
             elif self.playing_mode == PleerMode.CIRCLE:
                 song_ind = self.current_song_ind
             elif self.playing_mode == PleerMode.RANDOM:
-                song_ind =\
-                random.randrange(0,len(self.song_list),1)
+                song_ind = random.randrange(0,len(self.song_list),1)
         return(song_ind)
 
     # all music processing
@@ -151,16 +148,14 @@ class Pleer(Process):
         """
         # print("outputting")
         if status.output_underflow:
-            print('Output underflow: increase blocksize?',
-                    file=sys.stderr)
+            print('Output underflow: increase blocksize?', file=sys.stderr)
             raise sd.CallbackAbort
         # assert not status
         try:
             data = self.q.get_nowait()
             # print("Data shape is: {}".format(data.shape))
         except queue.Empty:
-            print('Buffer is empty: increase buffersize?',
-                    file=sys.stderr)
+            print('Buffer is empty: increase buffersize?', file=sys.stderr)
         if len(data) != len(outdata):
             # возможно запрещает пользоваться второй раз
             raise sd.CallbackStop
@@ -186,9 +181,11 @@ class Pleer(Process):
     def set_ind(self, song_ind=-1):
         # play specified song
         # self.play_ind(song_ind)
-        if (song_ind == -1): self.current_song_ind = self.next_song_ind()
-        else:                self.current_song_ind = song_ind
-        self.action           = PleerAction.SET_SONG
+        if song_ind == -1:
+            self.current_song_ind = self.next_song_ind()
+        else:
+            self.current_song_ind = song_ind
+        self.action = PleerAction.SET_SONG
         self.event_occure.set()
         pass
 
@@ -205,7 +202,7 @@ class Pleer(Process):
         """
         # increment without overflowing
         self.playing_mode = PleerMode((self.playing_mode.value + 1) %
-                len(list(PleerMode)) + 1)
+                                      len(list(PleerMode)) + 1)
         print("\rcurrent mode: {}".format(self.playing_mode))
 
     def exit(self):
@@ -241,8 +238,8 @@ class Pleer(Process):
         if self.connection_opened:
             send_on_device(self.color_controller, colors)
 
-        start = 0;
-        end = start + self.block_size;
+        start = 0
+        end = start + self.block_size
 
         # create queue so we can fetch music data from it later
         while True:
@@ -250,7 +247,8 @@ class Pleer(Process):
             self.q.put_nowait(buf)
             start = end
             end += self.block_size
-            if (start > len(music_arr)): break
+            if start > len(music_arr):
+                break
 
         # self.beat_detect = BeatDetection(3, self.q, self.block_size, inf[0])
         self.beat_detect = BeatDetection(3, music_arr, self.block_size, self.sr, fl)
@@ -308,7 +306,6 @@ class Pleer(Process):
     # pause song
     def pause(self):
         self.stream.__exit__()
-        # XXX: после точки не автодополняет
         self.state = PleerState.PAUSED
         pass
 
@@ -322,8 +319,7 @@ class Pleer(Process):
             self.event_occure.wait()    # blocking until event
 
             if self.action == PleerAction.SET_SONG:
-                if self.state == PleerState.PLAYING or\
-                        self.state == PleerState.PAUSED:
+                if self.state == PleerState.PLAYING or self.state == PleerState.PAUSED:
                     self.stop()
                 self._set_song_impl()
             elif self.action == PleerAction.SONG_FINISHED:
@@ -341,21 +337,18 @@ class Pleer(Process):
                 elif self.state == PleerState.CHILLING:
                     self._set_song_impl()
             elif self.action == PleerAction.NEXT_SONG:
-                if self.state == PleerState.PLAYING or \
-                    self.state == PleerState.PAUSED:
+                if self.state == PleerState.PLAYING or self.state == PleerState.PAUSED:
                     self.stop()
                 self.current_song_ind = self.next_song_ind()
                 self._set_song_impl()
             elif self.action == PleerAction.PREV_SONG:
-                if self.state == PleerState.PLAYING or \
-                    self.state == PleerState.PAUSED:
+                if self.state == PleerState.PLAYING or self.state == PleerState.PAUSED:
                     self.stop()
                 self.song_ind_stack.pop()   # remove last song
                 self.current_song_ind = self.song_ind_stack.pop()
                 self._set_song_impl()
             elif self.action == PleerAction.EXIT:
-                if self.state == PleerState.PLAYING or \
-                    self.state == PleerState.PAUSED:
+                if self.state == PleerState.PLAYING or self.state == PleerState.PAUSED:
                     self.stop()
                 break
 
@@ -379,4 +372,3 @@ class Pleer(Process):
 if __name__ == "__main__":
     print("script for manipulating and playing songs")
     exit(0)
-

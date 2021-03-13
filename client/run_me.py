@@ -33,7 +33,7 @@ parser.add_argument(
     '-o', '--outfile', type=str, default='/dev/rfcomm0',
     help='device to which output control sequences (serial port)')
 parser.add_argument(
-    '-m', '--musicdir', type=str, default='../music/',
+    '-m', '--musicdir', type=str, default='sandbox/music/',
     help='music dir containing mono float32 wav files')
 parser.add_argument(
     '-b', '--blocksize', type=int, default=2048,
@@ -50,9 +50,9 @@ if args.blocksize == 0:
 if args.buffersize < 1:
     parser.error('buffersize must be at least 1')
 
-if len(sys.argv) == 1:
-    parser.print_help(sys.stderr)
-    sys.exit(1)
+# if len(sys.argv) == 1:
+#     parser.print_help(sys.stderr)
+#     sys.exit(1)
 
 class _Getch:
     """Gets a single character from standard input.  Does not echo to the screen."""
@@ -62,7 +62,8 @@ class _Getch:
         except ImportError:
             self.impl = _GetchUnix()
 
-    def __call__(self): return self.impl()
+    def __call__(self):
+        return self.impl()
 
 class _GetchUnix:
     def __init__(self):
@@ -91,14 +92,14 @@ getch = _Getch()
 
 # reminder for user
 actions = {
-        " ":  "pause/unpause",
-        "<enter>": "stop/play (will start song from beginning)",
-        "<S-s>":   "set music for playing (interrupt current song)",
-        # TODO: output here v real PleerMode class instances
-        "c": "change mode",
-        "<arrows>/h/l":  "next/previous song",
-        "+/-": "make music louder/more quite",
-        "e":  "exit program",
+    " ":  "pause/unpause",
+    "<enter>": "stop/play (will start song from beginning)",
+    "<S-s>":   "set music for playing (interrupt current song)",
+    # TODO: output here v real PleerMode class instances
+    "c": "change mode",
+    "<arrows>/h/l":  "next/previous song",
+    "+/-": "make music louder/more quite",
+    "e":  "exit program",
 }
 
 def print_help():
@@ -111,8 +112,8 @@ def print_help():
 if __name__ == "__main__":
     # create instance of pleer (must be only one)
     pleer = Pleer(args.device, args.outfile,
-            PleerMode.SERIAL, args.blocksize,
-            args.loudness)
+                  PleerMode.SERIAL, args.blocksize,
+                  args.loudness)
     # add music folder passed as argument
     pleer.add_folder(args.musicdir)
     print(f'num of songs added {len(pleer.songs)}')
@@ -171,4 +172,3 @@ if __name__ == "__main__":
         print("{}".format(key_code))
         print("=" * 20)
         print_help()
-
