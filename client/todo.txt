@@ -1,0 +1,5 @@
+1. When pleer is playing music, try to exit from app.
+2. Play in native format but convert in program to my format
+3. stop and start
+
+1. Color output possibility
